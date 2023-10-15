@@ -1,4 +1,4 @@
-# 簡単な2自由度ロボットアームのモデル
+# 簡単な2自由度ロボットアームのモデル（Humble版）
 
 ## 概要
 
@@ -15,12 +15,12 @@
 
 - このパッケージを含むリポジトリを入手
   ```
-  git clone https://github.com/AI-Robot-Book/chapter6
+  git clone https://github.com/AI-Robot-Book-Humble/chapter6
   ```
 
 - パッケージのビルド
   ```
-  sudo apt install ros-foxy-joint-state-publisher-gui
+  sudo apt install ros-humble-joint-state-publisher-gui
   cd ~/airobot_ws
   colcon build --packages-select simple_arm_description
   ```
@@ -42,6 +42,7 @@
 
 ## 履歴
 
+- 2023-10-13: ROS Humbleで動作確認
 - 2022-08-23: ライセンス・ドキュメントの整備
 
 ## ライセンス
