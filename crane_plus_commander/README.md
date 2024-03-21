@@ -1,4 +1,4 @@
-# CRANE+ V2用のROS2ノード群を利用する簡単なノード
+# CRANE+ V2用のROS2ノード群を利用する簡単なノード（Humble版）
 
 ## 概要
 
@@ -6,7 +6,7 @@
 - ノードのプログラムは，Pythonで記述．
 - MoveIt2は使わずに，各関節へ指令値を送る．
 - [crane_plus_ignition](https://github.com/rt-net/crane_plus/tree/master/crane_plus_ignition)を使うことによってIgnition Gazebo内のCRANE+ V2を同じように動かすこともできる．
-- Ubuntu 20.04, ROS Foxyで作成・確認
+- Ubuntu 22.04, ROS Humbleで作成・確認
 
 ## 準備
 
@@ -30,12 +30,12 @@
 
 - このパッケージを含むリポジトリを入手
   ```
-  git clone https://github.com/AI-Robot-Book/chapter6
+  git clone https://github.com/AI-Robot-Book-Humble/chapter6
   ```
 
 - サービスのインタフェースを定義しているパッケージを含むリポジトリを入手
   ```
-  git clone https://github.com/AI-Robot-Book/chapter2
+  git clone https://github.com/AI-Robot-Book-Humble/chapter2
   ```
 
 - パッケージをビルド
@@ -60,7 +60,7 @@
     ```
   - 実機の代わりIgnition Gazeboを使う場合
     ```
-    ros2 launch crane_plus_commander crane_plus_ignition_no_moveit.launch.py 
+    ros2 launch crane_plus_commander crane_plus_gazebo_no_moveit.launch.py 
     ```
 
 - 端末2
@@ -115,11 +115,12 @@
 
 ## 履歴
 
+- 2023-10-15: ROS Humbleに対応
 - 2022-08-23: ライセンス・ドキュメントの整備
 
 ## ライセンス
 
-Copyright (c) 2022, MASUTANI Yasuhiro  
+Copyright (c) 2022, 2023 MASUTANI Yasuhiro  
 All rights reserved.  
 This project is licensed under the Apache License 2.0 license found in the LICENSE file in the root directory of this project.
 

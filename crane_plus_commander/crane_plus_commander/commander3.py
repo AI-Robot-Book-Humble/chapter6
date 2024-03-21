@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
+from rclpy.parameter import Parameter
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from sensor_msgs.msg import JointState
 import time
@@ -35,6 +36,10 @@ class Commander(Node):
         self.gripper = 0
         timer_period = 0.5  # [s]
         self.timer = self.create_timer(timer_period, self.timer_callback)
+        # /clockトピックのパブリッシャが存在すればuse_sim_timeをTrueにする
+        if self.get_publishers_info_by_topic('/clock') != []:
+            self.set_parameters([Parameter('use_sim_time', Parameter.Type.BOOL, True)])
+            self.get_logger().info('/clockパブリッシャ検出，use_sim_time: True')
 
     def publish_joint(self, q, time):
         msg = JointTrajectory()
@@ -85,6 +90,7 @@ def main():
 
     # 別のスレッドでrclpy.spin()を実行する
     thread = threading.Thread(target=rclpy.spin, args=(commander,))
+    threading.excepthook = lambda x: ()
     thread.start()
 
     # 最初の指令をパブリッシュする前に少し待つ
@@ -169,14 +175,14 @@ def main():
                     time.sleep(dt)
             time.sleep(0.01)
     except KeyboardInterrupt:
-        pass
+        thread.join()
+    else:
+        # 終了ポーズへゆっくり移動させる
+        joint = [0.0, 0.0, 0.0, 0.0]
+        gripper = 0
+        dt = 5
+        commander.publish_joint(joint, dt)
+        commander.publish_gripper(gripper, dt)
 
-    # 終了ポーズへゆっくり移動させる
-    joint = [0.0, 0.0, 0.0, 0.0]
-    gripper = 0
-    dt = 5
-    commander.publish_joint(joint, dt)
-    commander.publish_gripper(gripper, dt)
-
-    rclpy.shutdown()
+    rclpy.try_shutdown()
     print('終了')

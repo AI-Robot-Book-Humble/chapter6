@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
+from rclpy.parameter import Parameter
 from rclpy.action import ActionClient
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from control_msgs.action import FollowJointTrajectory
@@ -43,6 +44,10 @@ class Commander(Node):
         self.service = self.create_service(
             StringCommand, 'manipulation/command', self.command_callback,
             callback_group=self.callback_group)
+        # /clockトピックのパブリッシャが存在すればuse_sim_timeをTrueにする
+        if self.get_publishers_info_by_topic('/clock') != []:
+            self.set_parameters([Parameter('use_sim_time', Parameter.Type.BOOL, True)])
+            self.get_logger().info('/clockパブリッシャ検出，use_sim_time: True')
 
     def command_callback(self, request, response):
         self.get_logger().info(f'command: {request.command}')
@@ -169,5 +174,5 @@ def main():
     commander.send_goal_joint(commander.poses['zeros'], 5)
     commander.send_goal_gripper(from_gripper_ratio(0), 1)
 
-    rclpy.shutdown()
+    rclpy.try_shutdown()
     print('終了')
