@@ -16,7 +16,7 @@ from crane_plus_commander.kinematics import (
 # 他からアクションのリクエストを受け付け，CRANE+ V2用のアクションへリクエストを送るノード
 class Commander(Node):
 
-    def __init__(self, timer=False):
+    def __init__(self):
         super().__init__('commander')
         self.callback_group = ReentrantCallbackGroup()
         self.joint_names = [
