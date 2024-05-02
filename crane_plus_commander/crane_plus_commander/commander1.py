@@ -1,7 +1,6 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
-from rclpy.parameter import Parameter
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import time
 import threading

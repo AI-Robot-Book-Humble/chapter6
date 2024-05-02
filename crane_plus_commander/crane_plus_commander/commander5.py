@@ -1,7 +1,6 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
-from rclpy.parameter import Parameter
 from tf2_ros import LookupException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
