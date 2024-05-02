@@ -1,3 +1,4 @@
+import readline  # input()に履歴機能を追加するために必要
 import rclpy
 from rclpy.node import Node
 from airobot_interfaces.srv import StringCommand
