@@ -38,14 +38,9 @@ class Commander(Node):
         self.send_static_transform()
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
-        # /clockトピックのパブリッシャが存在すればuse_sim_timeをTrueにする
-        if self.get_publishers_info_by_topic('/clock') != []:
-            self.set_parameters([Parameter('use_sim_time', Parameter.Type.BOOL, True)])
-            self.get_logger().info('/clockパブリッシャ検出，use_sim_time: True')
 
     def publish_joint(self, q, time):
         msg = JointTrajectory()
-        msg.header.stamp = self.get_clock().now().to_msg()
         msg.joint_names = self.joint_names
         msg.points = [JointTrajectoryPoint()]
         msg.points[0].positions = [
@@ -56,7 +51,6 @@ class Commander(Node):
 
     def publish_gripper(self, gripper, time):
         msg = JointTrajectory()
-        msg.header.stamp = self.get_clock().now().to_msg()
         msg.joint_names = ['crane_plus_joint_hand']
         msg.points = [JointTrajectoryPoint()]
         msg.points[0].positions = [float(gripper)]
@@ -66,7 +60,6 @@ class Commander(Node):
 
     def send_static_transform(self):
         st = TransformStamped()
-        st.header.stamp = self.get_clock().now().to_msg()
         st.header.frame_id = 'crane_plus_link4'
         st.child_frame_id = 'crane_plus_endtip'
         st.transform.translation.x = 0.0

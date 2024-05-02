@@ -44,10 +44,6 @@ class Commander(Node):
         self.service = self.create_service(
             StringCommand, 'manipulation/command', self.command_callback,
             callback_group=self.callback_group)
-        # /clockトピックのパブリッシャが存在すればuse_sim_timeをTrueにする
-        if self.get_publishers_info_by_topic('/clock') != []:
-            self.set_parameters([Parameter('use_sim_time', Parameter.Type.BOOL, True)])
-            self.get_logger().info('/clockパブリッシャ検出，use_sim_time: True')
 
     def command_callback(self, request, response):
         self.get_logger().info(f'command: {request.command}')
@@ -106,7 +102,6 @@ class Commander(Node):
     def send_goal_joint(self, q, time):
         goal_msg = FollowJointTrajectory.Goal()
         goal_msg.trajectory = JointTrajectory()
-        goal_msg.trajectory.header.stamp = self.get_clock().now().to_msg()
         goal_msg.trajectory.joint_names = self.joint_names
         goal_msg.trajectory.points = [JointTrajectoryPoint()]
         goal_msg.trajectory.points[0].positions = [
@@ -123,7 +118,6 @@ class Commander(Node):
     def send_goal_gripper(self, gripper, time):
         goal_msg = FollowJointTrajectory.Goal()
         goal_msg.trajectory = JointTrajectory()
-        goal_msg.trajectory.header.stamp = self.get_clock().now().to_msg()
         goal_msg.trajectory.joint_names = self.gripper_names
         goal_msg.trajectory.points = [JointTrajectoryPoint()]
         goal_msg.trajectory.points[0].positions = [float(gripper)]
