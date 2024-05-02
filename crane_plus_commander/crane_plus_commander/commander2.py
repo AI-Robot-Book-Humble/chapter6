@@ -82,7 +82,7 @@ def main():
     print('スペースキーを押して起立状態にする')
     print('Escキーを押して終了')
 
-    # Ctrl+cでエラーにならないようにKeyboardInterruptを捕まえる
+    # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
             # 順運動学

@@ -122,7 +122,7 @@ def main():
 
     print('同期的なアクションの利用')
 
-    # Ctrl+cでエラーにならないようにKeyboardInterruptを捕まえる
+    # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
             # 目標関節値とともに送る目標時間
