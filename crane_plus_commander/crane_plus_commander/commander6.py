@@ -1,18 +1,19 @@
+import threading
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
-from rclpy.action import ActionClient
+from rclpy.action import ActionClient, ActionServer, CancelResponse
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from control_msgs.action import FollowJointTrajectory
 from threading import Event
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from airobot_interfaces.srv import StringCommand
+from airobot_interfaces.action import StringCommand
 from crane_plus_commander.kinematics import (
     from_gripper_ratio, gripper_in_range)
 
 
-# CRANE+ V2用のアクションへリクエストを送り，他からサービスを受け付けるノード
+# 他からアクションのリクエストを受け付け，CRANE+ V2用のアクションへリクエストを送るノード
 class Commander(Node):
 
     def __init__(self, timer=False):
@@ -40,61 +41,100 @@ class Commander(Node):
         self.poses['ones'] = [1, 1, 1, 1]
         self.poses['home'] = [0.0, -1.16, -2.01, -0.73]
         self.poses['carry'] = [-0.00, -1.37, -2.52, 1.17]
-        self.service = self.create_service(
-            StringCommand, 'manipulation/command', self.command_callback,
-            callback_group=self.callback_group)
+        self.server_goal_handle = None
+        self.client_goal_handle = None
+        self.goal_lock = threading.Lock()
+        self.execute_lock = threading.Lock()
+        self.action_server = ActionServer(
+            self,
+            StringCommand,
+            'manipulation/command',
+            self.execute_callback,
+            cancel_callback=self.cancel_callback,
+            handle_accepted_callback=self.handle_accepted_callback,
+            callback_group=self.callback_group,
+        )
 
-    def command_callback(self, request, response):
-        self.get_logger().info(f'command: {request.command}')
-        words = request.command.split()
-        if words[0] == 'set_pose':
-            self.set_pose(words, response)
-        elif words[0] == 'set_gripper':
-            self.set_gripper(words, response)
-        else:
-            response.answer = f'NG {words[0]} not supported'
-        self.get_logger().info(f'answer: {response.answer}')
-        return response
+    def handle_accepted_callback(self, server_goal_handle):
+        with self.goal_lock:
+            if self.server_goal_handle is not None and self.server_goal_handle.is_active:
+                self.get_logger().info('サーバ： 前の処理を中止')
+                self.server_goal_handle.abort()
+                self.action_done_event.set()
+            self.server_goal_handle = server_goal_handle
+        server_goal_handle.execute()
 
-    def set_pose(self, words, response):
+    def execute_callback(self, server_goal_handle):
+        with self.execute_lock:
+            self.get_logger().info(f'command: {server_goal_handle.request.command}')
+            server_result = StringCommand.Result()
+            words = server_goal_handle.request.command.split()
+            if words[0] == 'set_pose':
+                self.set_pose(words, server_result, server_goal_handle)
+            elif words[0] == 'set_gripper':
+                self.set_gripper(words, server_result, server_goal_handle)
+            else:
+                server_result.answer = f'NG {words[0]} not supported'
+            self.get_logger().info(f'answer: {server_result.answer}')
+            if server_result.answer.startswith('OK'):
+                server_goal_handle.succeed()
+            return server_result
+
+    def cancel_callback(self, server_goal_handle):
+        self.get_logger().info('サーバ： キャンセル受信')
+        self.action_done_event.set()
+        return CancelResponse.ACCEPT
+
+    def set_pose(self, words, server_result, server_goal_handle):
         if len(words) < 2:
-            response.answer = f'NG {words[0]} argument required'
+            server_result.answer = f'NG {words[0]} argument required'
             return
         if not words[1] in self.poses:
-            response.answer = f'NG {words[1]} not found'
+            server_result.answer = f'NG {words[1]} not found'
             return
-        r = self.send_goal_joint(self.poses[words[1]], 3.0)
-        if self.check_action_result(r, response):
+        dt = 3.0
+        client_result = self.send_goal_joint(self.poses[words[1]], dt)
+        if self.check_action_result(client_result, server_result, server_goal_handle):
             return
-        response.answer = 'OK'
+        server_result.answer = 'OK'
 
-    def set_gripper(self, words, response):
+    def set_gripper(self, words, server_result, server_goal_handle):
         if len(words) < 2:
-            response.answer = f'NG {words[0]} argument required'
+            server_result.answer = f'NG {words[0]} argument required'
             return
         try:
             gripper_ratio = float(words[1])
         except ValueError:
-            response.answer = f'NG {words[1]} unsuitable'
+            server_result.answer = f'NG {words[1]} unsuitable'
             return
         gripper = from_gripper_ratio(gripper_ratio)
         if not gripper_in_range(gripper):
-            response.answer = 'NG out of range'
+            server_result.answer = 'NG out of range'
             return
         dt = 1.0
-        r = self.send_goal_gripper(gripper, dt)
-        if self.check_action_result(r, response):
+        client_result = self.send_goal_gripper(gripper, dt)
+        if self.check_action_result(client_result, server_result, server_goal_handle):
             return
-        response.answer = 'OK'
+        server_result.answer = 'OK'
 
-    def check_action_result(self, r, response, message=''):
+    def check_action_result(self, client_result, server_result, server_goal_handle, message=''):
         if message != '':
             message += ' '
-        if r is None:
-            response.answer = f'NG {message}timeout'
+        if client_result is None:
+            if not server_goal_handle.is_active:
+                self.get_logger().warn('サーバ： 中止')
+                server_result.answer = f'NG {message}aborted'
+            elif server_goal_handle.is_cancel_requested:
+                server_goal_handle.canceled()
+                self.cancel()
+                self.get_logger().warn('サーバ： キャンセル')
+                server_result.answer = f'NG {message}canceled'
+            else:
+                self.get_logger().warn('クライアント： タイムアウト')
+                server_result.answer = f'NG {message}timeout'
             return True
-        if r.result.error_code != 0:
-            response.answer = f'NG {message}error_code: {r.result.error_code}'
+        if client_result.result.error_code != 0:
+            server_result.answer = f'NG {message}error_code: {client_result.result.error_code}'
             return True
         return False
 
@@ -132,13 +172,34 @@ class Commander(Node):
     def goal_response_callback(self, future):
         goal_handle = future.result()
         if not goal_handle.accepted:
+            self.get_logger().warn('クライアント: サーバがゴール拒否')
             return
+        self.client_goal_handle = goal_handle
+        self.get_logger().info('クライアント： サーバがゴール受け付け')
         self.get_result_future = goal_handle.get_result_async()
         self.get_result_future.add_done_callback(self.get_result_callback)
 
     def get_result_callback(self, future):
         self.action_result = future.result()
+        self.client_goal_handle = None
         self.action_done_event.set()
+        self.get_logger().info('クライアント： リザルト受信')
+
+    def cancel(self):
+        if self.client_goal_handle is None:
+            self.get_logger().warn('クライアント： キャンセル対象なし')
+            return
+        self.get_logger().info('クライアント： キャンセル送信')
+        future = self.client_goal_handle.cancel_goal_async()
+        future.add_done_callback(self.cancel_done)
+
+    def cancel_done(self, future):
+        cancel_response = future.result()
+        if len(cancel_response.goals_canceling) > 0:
+            self.get_logger().info('クライアント： キャンセル成功')
+            self.client_goal_handle = None
+        else:
+            self.get_logger().warn('クライアント： キャンセル失敗')
 
 
 def main():
