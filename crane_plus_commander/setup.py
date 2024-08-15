@@ -31,6 +31,7 @@ setup(
             'commander5 = crane_plus_commander.commander5:main',
             'commander6 = crane_plus_commander.commander6:main',
             'test_client = crane_plus_commander.test_client:main',
+            'commander4_moveit = crane_plus_commander.commander4_moveit:main',
          ],
     },
 )
