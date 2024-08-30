@@ -9,11 +9,11 @@ from pymoveit2 import GripperInterface
 from math import radians
 
 
-class MoveitTest(Node):
+# CRNAE+ V2用のMoveItへ登録されたポーズを送るノード
+class CommanderMoveit(Node):
 
     def __init__(self, timer=False):
-        super().__init__('moveit_test')
-
+        super().__init__('commander_moveit')
         joint_names = [
             'crane_plus_joint1',
             'crane_plus_joint2',
@@ -76,7 +76,7 @@ def main():
     rclpy.init()
 
     # ノードクラスのインスタンス
-    node = MoveitTest()
+    node = CommanderMoveit()
 
     executor = MultiThreadedExecutor()
 
