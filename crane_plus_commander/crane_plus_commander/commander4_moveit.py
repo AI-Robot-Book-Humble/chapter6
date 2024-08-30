@@ -12,7 +12,7 @@ from math import radians
 # CRNAE+ V2用のMoveItへ登録されたポーズを送るノード
 class CommanderMoveit(Node):
 
-    def __init__(self, timer=False):
+    def __init__(self):
         super().__init__('commander_moveit')
         joint_names = [
             'crane_plus_joint1',
