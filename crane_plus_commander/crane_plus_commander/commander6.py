@@ -18,33 +18,30 @@ class Commander(Node):
 
     def __init__(self):
         super().__init__('commander')
-        self.callback_group = ReentrantCallbackGroup()
         self.joint_names = [
             'crane_plus_joint1',
             'crane_plus_joint2',
             'crane_plus_joint3',
             'crane_plus_joint4']
-        self.gripper_names = [
-            'crane_plus_joint_hand']
+        self.callback_group = ReentrantCallbackGroup()
         self.action_client_joint = ActionClient(
             self, FollowJointTrajectory,
             'crane_plus_arm_controller/follow_joint_trajectory',
             callback_group=self.callback_group)
+        self.gripper_names = [
+            'crane_plus_joint_hand']
         self.action_client_gripper = ActionClient(
             self, FollowJointTrajectory,
             'crane_plus_gripper_controller/follow_joint_trajectory',
             callback_group=self.callback_group)
-        self.action_done_event = Event()
         # 文字列とポーズの組を保持する辞書
         self.poses = {}
         self.poses['zeros'] = [0, 0, 0, 0]
         self.poses['ones'] = [1, 1, 1, 1]
         self.poses['home'] = [0.0, -1.16, -2.01, -0.73]
         self.poses['carry'] = [-0.00, -1.37, -2.52, 1.17]
-        self.server_goal_handle = None
-        self.client_goal_handle = None
-        self.goal_lock = threading.Lock()
-        self.execute_lock = threading.Lock()
+        
+        # アクションサーバ
         self.action_server = ActionServer(
             self,
             StringCommand,
@@ -54,6 +51,13 @@ class Commander(Node):
             handle_accepted_callback=self.handle_accepted_callback,
             callback_group=self.callback_group,
         )
+        self.action_done_event = Event()
+        self.server_goal_handle = None
+        self.goal_lock = threading.Lock()
+        self.execute_lock = threading.Lock()
+
+        # アクションクライアント
+        self.client_goal_handle = None
 
     def handle_accepted_callback(self, server_goal_handle):
         with self.goal_lock:
@@ -78,6 +82,8 @@ class Commander(Node):
             self.get_logger().info(f'answer: {server_result.answer}')
             if server_result.answer.startswith('OK'):
                 server_goal_handle.succeed()
+            else:
+                server_goal_handle.abort()
             return server_result
 
     def cancel_callback(self, server_goal_handle):
