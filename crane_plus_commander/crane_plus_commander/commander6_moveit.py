@@ -2,12 +2,11 @@ import threading
 import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionServer, CancelResponse
-from threading import Event
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from airobot_interfaces.action import StringCommand
 import threading
-from pymoveit2 import MoveIt2, GripperInterface
+from pymoveit2 import MoveIt2, GripperInterface, MoveIt2State
 from math import radians
 
 GRIPPER_MIN = -radians(40.62) + 0.001
@@ -77,7 +76,6 @@ class CommanderMoveit(Node):
             handle_accepted_callback=self.handle_accepted_callback,
             callback_group=callback_group,
         )
-        self.action_done_event = Event()
         self.goal_handle = None
         self.goal_lock = threading.Lock()
         self.execute_lock = threading.Lock()
@@ -136,18 +134,24 @@ class CommanderMoveit(Node):
             result.answer = f'NG {words[0]} move_gripper() failed'
 
     def cancel_callback(self, goal_handle):
-        self.get_logger().info('サーバ： キャンセル受信')
-        self.action_done_event.set()
+        self.get_logger().info('キャンセル受信')
+        self.cancel_joint_and_gripper()
         return CancelResponse.ACCEPT
 
     def handle_accepted_callback(self, goal_handle):
         with self.goal_lock:
             if self.goal_handle is not None and self.goal_handle.is_active:
-                self.get_logger().info('サーバ： 前の処理を中止')
+                self.get_logger().info('前の処理を中止')
                 self.goal_handle.abort()
-                self.action_done_event.set()
+                self.cancel_joint_and_gripper()
             self.goal_handle = goal_handle
         goal_handle.execute()
+
+    def cancel_joint_and_gripper(self):
+        if self.moveit2.query_state() == MoveIt2State.EXECUTING:
+            self.moveit2.cancel_execution()
+        if self.gripper_interface.query_state() == MoveIt2State.EXECUTING:
+            self.gripper_interface.cancel_execution()
 
     def move_joint(self, q):
         joint_positions = [
