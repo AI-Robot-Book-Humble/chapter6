@@ -38,6 +38,7 @@ setup(
             'commander5_moveit = crane_plus_commander.commander5_moveit:main',
             'commander6_moveit = crane_plus_commander.commander6_moveit:main',
             'commander7 = crane_plus_commander.commander7:main',
+            'commander7_moveit = crane_plus_commander.commander7_moveit:main',
         ],
     },
 )
