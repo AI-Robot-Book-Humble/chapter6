@@ -2,15 +2,16 @@ import rclpy
 from rclpy.node import Node
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
+import time
 import threading
+from crane_plus_commander.kbhit import KBHit
 from pymoveit2 import MoveIt2, GripperInterface
 from math import radians
 
 GRIPPER_MIN = -radians(40.62) + 0.001
 GRIPPER_MAX = radians(38.27) - 0.001
 
-
-# CRNAE+ V2用のMoveItへ登録されたポーズの関節値を送るノード
+# CRNAE+ V2用のMoveItへ関節値の指令を送るノード
 class CommanderMoveit(Node):
 
     def __init__(self):
@@ -45,6 +46,10 @@ class CommanderMoveit(Node):
             gripper_command_action_name='gripper_action_controller/gripper_cmd',
         )
 
+        self.object_id = 'table_top'
+        self.moveit2.add_collision_box(
+            id=self.object_id, size=[1.0, 1.0, 0.01], position=[0.0, 0.0, 0.0], quat_xyzw=[0.0, 0.0, 0.0, 1.0])
+
     def move_joint(self, q):
         joint_positions = [
             float(q[0]), float(q[1]), float(q[2]), float(q[3])]
@@ -58,14 +63,6 @@ class CommanderMoveit(Node):
 
     def set_max_velocity(self, v):
         self.moveit2.max_velocity = float(v)
-
-    def get_joint(self):
-        msg = self.moveit2.joint_state
-        d = {}
-        for i, name in enumerate(msg.name):
-            d[name] = msg.position[i]
-        joint = [d[x] for x in self.joint_names]
-        return joint
 
 
 def main():
@@ -81,39 +78,75 @@ def main():
     threading.excepthook = lambda x: ()
     thread.start()
 
-    # 文字列とポーズの組を保持する辞書
-    goals = {}
-    goals['zeros'] = [0, 0, 0, 0]
-    goals['ones'] = [1, 1, 1, 1]
-    goals['home'] = [0.0, -1.16, -2.01, -0.73]
-    goals['carry'] = [-0.00, -1.37, -2.52, 1.17]
-
     # 初期ポーズへゆっくり移動させる
     joint = [0.0, 0.0, 0.0, 0.0]
     gripper = 0
     commander.set_max_velocity(0.2)
     commander.move_joint(joint)
     commander.move_gripper(gripper)
-    commander.set_max_velocity(0.5)
+
+    # キー読み取りクラスのインスタンス
+    kb = KBHit()
+
+    print('1, 2, 3, 4, 5, 6, 7, 8, 9, 0キーを押して関節を動かす')
+    print('スペースキーを押して起立状態にする')
+    print('Escキーを押して終了')
 
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
-            for key, item in goals.items():
-                print(f'{key:8} {item}')
-            name = input('目標の名前を入力: ')
-            if name == '':
-                break
-            if name not in goals:
-                print(f'{name}は登録されていません')
-                continue
+            # 変更前の値を保持
+            joint_prev = joint.copy()
+            gripper_prev = gripper
 
-            print('目標を送って結果待ち…')
-            r = commander.move_joint(goals[name])
-            print(f'move_joint() {"成功" if r else "失敗"}')
-            j = commander.get_joint()
-            print(f'[{j[0]:.2f}, {j[1]:.2f}, {j[2]:.2f}, {j[3]:.2f}]')
-            print('')
+            commander.set_max_velocity(1.0)
+
+            # キーが押されているか？
+            if kb.kbhit():
+                c = kb.getch()
+                # 押されたキーによって場合分けして処理
+                if c == '1':
+                    joint[0] -= 0.1
+                elif c == '2':
+                    joint[0] += 0.1
+                elif c == '3':
+                    joint[1] -= 0.1
+                elif c == '4':
+                    joint[1] += 0.1
+                elif c == '5':
+                    joint[2] -= 0.1
+                elif c == '6':
+                    joint[2] += 0.1
+                elif c == '7':
+                    joint[3] -= 0.1
+                elif c == '8':
+                    joint[3] += 0.1
+                elif c == '9':
+                    gripper -= 0.1
+                elif c == '0':
+                    gripper += 0.1
+                elif c == ' ':  # スペースキー
+                    joint = [0.0, 0.0, 0.0, 0.0]
+                    gripper = 0
+                    commander.set_max_velocity(0.2)
+                elif ord(c) == 27:  # Escキー
+                    break
+                # 変化があれば指令を送る
+                if joint != joint_prev:
+                    print((f'joint: [{joint[0]:.2f}, {joint[1]:.2f}, '
+                           f'{joint[2]:.2f}, {joint[3]:.2f}]'))
+                    success = commander.move_joint(joint)
+                    if not success:
+                        print('move_joint()失敗')
+                        joint = joint_prev.copy()
+                if gripper != gripper_prev:
+                    print(f'gripper: {gripper:.2f}')
+                    success = commander.move_gripper(gripper)
+                    if not success:
+                        print('move_gripper()失敗')
+                        gripper = gripper_prev
+
+            time.sleep(0.01)
     except KeyboardInterrupt:
         thread.join()
     else:
