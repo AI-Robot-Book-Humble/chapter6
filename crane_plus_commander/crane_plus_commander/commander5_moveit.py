@@ -6,13 +6,12 @@ from rclpy.duration import Duration
 from tf2_ros import TransformException
 from tf2_ros.buffer import Buffer
 from tf2_ros.transform_listener import TransformListener
-from tf_transformations import euler_from_quaternion
+from tf_transformations import euler_from_quaternion, quaternion_from_euler
 import time
 import threading
 from math import sqrt, radians, atan2
 from crane_plus_commander.kbhit import KBHit
 from pymoveit2 import MoveIt2, GripperInterface
-import tf_transformations as tft
 
 GRIPPER_MIN = -radians(40.62) + 0.001
 GRIPPER_MAX = radians(38.27) - 0.001
@@ -66,7 +65,7 @@ class CommanderMoveit(Node):
         position = [float(endtip[0]), float(endtip[1]), float(endtip[2])]
         yaw = atan2(position[1], position[0])
         pitch = float(endtip[3])
-        quat_xyzw = tft.quaternion_from_euler(0.0, pitch, yaw)
+        quat_xyzw = quaternion_from_euler(0.0, pitch, yaw)
         self.moveit2.move_to_pose(
             position=position,
             quat_xyzw=quat_xyzw
@@ -94,14 +93,14 @@ class CommanderMoveit(Node):
                 timeout=Duration(seconds=1.0))
         except TransformException as ex:
             self.get_logger().info(f'{ex}')
-            return None
+            return None, ex
         t = trans.transform.translation
         r = trans.transform.rotation
         roll, pitch, yaw = euler_from_quaternion([r.x, r.y, r.z, r.w])
-        return [t.x, t.y, t.z, roll, pitch, yaw]
+        return [t.x, t.y, t.z, roll, pitch, yaw], None
 
 
-# リストで表された3次元座標かんの距離を計算する
+# リストで表された3次元座標間の距離を計算する
 def dist(a, b):
     return sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2)
 
@@ -147,7 +146,7 @@ def main():
                 if ord(c) == 27:  # Escキー
                     break
 
-            position = commander.get_frame_position('target')
+            position, _ = commander.get_frame_position('target')
             if position is None:
                 print('対象のフレームが見つからない')
             else:
@@ -164,11 +163,11 @@ def main():
                         commander.set_max_velocity(1.0)
                         pitch = 0
                         sucess = commander.move_endtip(xyz_now + [pitch])
-                        if not sucess:
-                            print('move_endtip()失敗')
-                        else:
+                        if sucess:
                             print('move_endtip()成功')
                             state = DONE
+                        else:
+                            print('move_endtip()失敗')
                 elif state == DONE:
                     if dist(xyz_now, xyz_first) > 0.01:
                         state = INIT
