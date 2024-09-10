@@ -7,7 +7,7 @@ import threading
 from crane_plus_commander.kbhit import KBHit
 from pymoveit2 import MoveIt2, GripperInterface
 from math import radians, atan2
-import tf_transformations as tft
+from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 GRIPPER_MIN = -radians(40.62) + 0.001
 GRIPPER_MAX = radians(38.27) - 0.001
@@ -77,14 +77,14 @@ class CommanderMoveit(Node):
         p = pose_stamped.pose.position
         [x, y, z] = [p.x, p.y, p.z]
         q = pose_stamped.pose.orientation
-        [_, pitch,_] = tft.euler_from_quaternion([q.x, q.y, q.z, q.w])
+        [_, pitch,_] = euler_from_quaternion([q.x, q.y, q.z, q.w])
         return [x, y, z, pitch]
 
     def inverse_kinematics(self, endtip, elbow_up):
         [x, y, z, pitch] = endtip
         position = [x, y, z]
         yaw = atan2(y, x)
-        quat_xyzw = tft.quaternion_from_euler(0.0, pitch, yaw)
+        quat_xyzw = quaternion_from_euler(0.0, pitch, yaw)
         if elbow_up:
             start_joint_state = [0.0, 0.0, -1.57, 0.0]
         else:
