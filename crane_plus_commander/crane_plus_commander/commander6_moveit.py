@@ -24,7 +24,7 @@ def gripper_in_range(gripper):
     return GRIPPER_MIN <= gripper <= GRIPPER_MAX
 
 
-# 他からアクションのリクエストを受け付け，CRANE+ V2用のアクションへリクエストを送るノード
+# 他からアクションのリクエストを受け付け，CRANE+ V2用のMoveItへ指令を送るノード
 class CommanderMoveit(Node):
 
     def __init__(self):
