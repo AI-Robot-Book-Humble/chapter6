@@ -94,10 +94,11 @@ class CommanderMoveit(Node):
             else:
                 result.answer = f'NG {words[0]} not supported'
             self.get_logger().info(f'answer: {result.answer}')
-            if result.answer.startswith('OK'):
-                goal_handle.succeed()
-            else:
-                goal_handle.abort()
+            if goal_handle.is_active:
+                if result.answer.startswith('OK'):
+                    goal_handle.succeed()
+                else:
+                    goal_handle.abort()
             return result
 
     def set_pose(self, words, result):

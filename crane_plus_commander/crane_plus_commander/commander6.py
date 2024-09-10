@@ -28,12 +28,16 @@ class Commander(Node):
             self, FollowJointTrajectory,
             'crane_plus_arm_controller/follow_joint_trajectory',
             callback_group=self.callback_group)
+        while not self.action_client_joint.wait_for_server(timeout_sec=1.0):
+            self.get_logger().info('jointアクションサーバ無効，待機中...')      
         self.gripper_names = [
             'crane_plus_joint_hand']
         self.action_client_gripper = ActionClient(
             self, FollowJointTrajectory,
             'crane_plus_gripper_controller/follow_joint_trajectory',
             callback_group=self.callback_group)
+        while not self.action_client_gripper.wait_for_server(timeout_sec=1.0):
+            self.get_logger().info('gripperアクションサーバ無効，待機中...')      
         # 文字列とポーズの組を保持する辞書
         self.poses = {}
         self.poses['zeros'] = [0, 0, 0, 0]
@@ -80,10 +84,11 @@ class Commander(Node):
             else:
                 server_result.answer = f'NG {words[0]} not supported'
             self.get_logger().info(f'answer: {server_result.answer}')
-            if server_result.answer.startswith('OK'):
-                server_goal_handle.succeed()
-            else:
-                server_goal_handle.abort()
+            if server_goal_handle.is_active:
+                if server_result.answer.startswith('OK'):
+                    server_goal_handle.succeed()
+                else:
+                    server_goal_handle.abort()
             return server_result
 
     def cancel_callback(self, server_goal_handle):
