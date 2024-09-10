@@ -63,11 +63,11 @@ class Commander(Node):
                 timeout=Duration(seconds=1.0))
         except TransformException as ex:
             self.get_logger().info(f'{ex}')
-            return None
+            return None, ex
         t = trans.transform.translation
         r = trans.transform.rotation
         roll, pitch, yaw = euler_from_quaternion([r.x, r.y, r.z, r.w])
-        return [t.x, t.y, t.z, roll, pitch, yaw]
+        return [t.x, t.y, t.z, roll, pitch, yaw], None
 
 
 # リストで表された3次元座標かんの距離を計算する
@@ -119,7 +119,7 @@ def main():
                 if ord(c) == 27:  # Escキー
                     break
 
-            position = commander.get_frame_position('target')
+            position, _ = commander.get_frame_position('target')
             if position is None:
                 print('対象のフレームが見つからない')
             else:
