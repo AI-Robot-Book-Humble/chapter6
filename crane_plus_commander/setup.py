@@ -39,6 +39,13 @@ setup(
             'commander6_moveit = crane_plus_commander.commander6_moveit:main',
             'commander7 = crane_plus_commander.commander7:main',
             'commander7_moveit = crane_plus_commander.commander7_moveit:main',
+            'challenge6_1 = crane_plus_commander.challenge6_1:main',
+            'challenge6_2 = crane_plus_commander.challenge6_2:main',
+            'challenge6_4 = crane_plus_commander.challenge6_4:main',
+            'challenge6_5 = crane_plus_commander.challenge6_5:main',
+            'challenge6_6 = crane_plus_commander.challenge6_6:main',
+            'challenge6_7 = crane_plus_commander.challenge6_7:main',
+            'challenge6_8 = crane_plus_commander.challenge6_8:main',
         ],
     },
 )
