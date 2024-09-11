@@ -1,151 +1,168 @@
+import threading
 import rclpy
 from rclpy.node import Node
-from rclpy.duration import Duration
-from rclpy.parameter import Parameter
-from rclpy.action import ActionClient
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from control_msgs.action import FollowJointTrajectory
-from threading import Event
+from rclpy.action import ActionServer, CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
-from airobot_interfaces.srv import StringCommand
-from crane_plus_commander.kinematics import (
-    from_gripper_ratio, gripper_in_range)
+from airobot_interfaces.action import StringCommand
+import threading
+from pymoveit2 import MoveIt2, GripperInterface, MoveIt2State
+from math import radians
+
+GRIPPER_MIN = -radians(40.62) + 0.001
+GRIPPER_MAX = radians(38.27) - 0.001
+
+def to_gripper_ratio(gripper):
+    ratio = (gripper - GRIPPER_MIN) / (GRIPPER_MAX - GRIPPER_MIN)
+    return ratio
+
+def from_gripper_ratio(ratio):
+    gripper = GRIPPER_MIN + ratio * (GRIPPER_MAX - GRIPPER_MIN)
+    return gripper
 
 
-# CRANE+ V2用のアクションへリクエストを送り，他からサービスを受け付けるノード
-class Commander(Node):
+# 他からアクションのリクエストを受け付け，CRANE+ V2用のMoveItへ指令を送るノード
+class CommanderMoveit(Node):
 
-    def __init__(self, timer=False):
-        super().__init__('commander')
-        self.callback_group = ReentrantCallbackGroup()
+    def __init__(self):
+        super().__init__('commander_moveit')
         self.joint_names = [
             'crane_plus_joint1',
             'crane_plus_joint2',
             'crane_plus_joint3',
             'crane_plus_joint4']
-        self.gripper_names = [
-            'crane_plus_joint_hand']
-        self.action_client_joint = ActionClient(
-            self, FollowJointTrajectory,
-            'crane_plus_arm_controller/follow_joint_trajectory',
-            callback_group=self.callback_group)
-        self.action_client_gripper = ActionClient(
-            self, FollowJointTrajectory,
-            'crane_plus_gripper_controller/follow_joint_trajectory',
-            callback_group=self.callback_group)
-        self.action_done_event = Event()
+        callback_group = ReentrantCallbackGroup()
+        self.moveit2 = MoveIt2(
+            node=self,
+            joint_names=self.joint_names,
+            base_link_name='crane_plus_base',
+            end_effector_name='crane_plus_link_endtip',
+            group_name='arm',
+            callback_group=callback_group,
+        )
+        self.moveit2.planner_id = 'RRTConnectkConfigDefault'
+        self.moveit2.max_velocity = 0.5
+        self.moveit2.max_acceleration = 0.5
+        self.cancel_after_secs = 0.0
+
+        gripper_joint_names = ['crane_plus_joint_hand']
+        self.gripper_interface = GripperInterface(
+            node=self,
+            gripper_joint_names=gripper_joint_names,
+            open_gripper_joint_positions=[GRIPPER_MIN],
+            closed_gripper_joint_positions=[GRIPPER_MAX],
+            gripper_group_name='gripper',
+            callback_group=callback_group,
+            gripper_command_action_name='gripper_action_controller/gripper_cmd',
+        )
+
         # 文字列とポーズの組を保持する辞書
         self.poses = {}
         self.poses['zeros'] = [0, 0, 0, 0]
         self.poses['ones'] = [1, 1, 1, 1]
         self.poses['home'] = [0.0, -1.16, -2.01, -0.73]
         self.poses['carry'] = [-0.00, -1.37, -2.52, 1.17]
-        self.service = self.create_service(
-            StringCommand, 'manipulation/command', self.command_callback,
-            callback_group=self.callback_group)
-        # /clockトピックのパブリッシャが存在すればuse_sim_timeをTrueにする
-        if self.get_publishers_info_by_topic('/clock') != []:
-            self.set_parameters([Parameter('use_sim_time', Parameter.Type.BOOL, True)])
-            self.get_logger().info('/clockパブリッシャ検出，use_sim_time: True')
 
-    def command_callback(self, request, response):
-        self.get_logger().info(f'command: {request.command}')
-        words = request.command.split()
-        if words[0] == 'set_pose':
-            self.set_pose(words, response)
-        elif words[0] == 'set_gripper':
-            self.set_gripper(words, response)
-        else:
-            response.answer = f'NG {words[0]} not supported'
-        self.get_logger().info(f'answer: {response.answer}')
-        return response
+        # アクションサーバ
+        self.action_server = ActionServer(
+            self,
+            StringCommand,
+            'manipulation/command',
+            self.execute_callback,
+            cancel_callback=self.cancel_callback,
+            handle_accepted_callback=self.handle_accepted_callback,
+            callback_group=callback_group,
+        )
+        self.goal_handle = None
+        self.goal_lock = threading.Lock()
+        self.execute_lock = threading.Lock()
 
-    def set_pose(self, words, response):
+    def execute_callback(self, goal_handle):
+        with self.execute_lock:
+            self.get_logger().info(f'command: {goal_handle.request.command}')
+            result = StringCommand.Result()
+            words = goal_handle.request.command.split()
+            if words[0] == 'set_pose':
+                self.set_pose(words, result)
+            elif words[0] == 'set_gripper':
+                self.set_gripper(words, result)
+            else:
+                result.answer = f'NG {words[0]} not supported'
+            self.get_logger().info(f'answer: {result.answer}')
+            if goal_handle.is_active:
+                if result.answer.startswith('OK'):
+                    goal_handle.succeed()
+                else:
+                    goal_handle.abort()
+            return result
+
+    def set_pose(self, words, result):
         if len(words) < 2:
-            response.answer = f'NG {words[0]} argument required'
+            result.answer = f'NG {words[0]} argument required'
             return
         if not words[1] in self.poses:
-            response.answer = f'NG {words[1]} not found'
+            result.answer = f'NG {words[1]} not found'
             return
-        r = self.send_goal_joint(self.poses[words[1]], 3.0)
-        if self.check_action_result(r, response):
-            return
-        response.answer = 'OK'
+        self.set_max_velocity(0.5)
+        success = self.move_joint(self.poses[words[1]])
+        if success:
+            result.answer = 'OK'
+        else:
+            result.answer = f'NG {words[0]} move_joint() failed'
 
-    def set_gripper(self, words, response):
+    def set_gripper(self, words, result):
         if len(words) < 2:
-            response.answer = f'NG {words[0]} argument required'
+            result.answer = f'NG {words[0]} argument required'
             return
         try:
             gripper_ratio = float(words[1])
         except ValueError:
-            response.answer = f'NG {words[1]} unsuitable'
+            result.answer = f'NG {words[1]} unsuitable'
+            return
+        if gripper_ratio < 0.0 or 1.0 < gripper_ratio:
+            result.answer = 'NG out of range'
             return
         gripper = from_gripper_ratio(gripper_ratio)
-        if not gripper_in_range(gripper):
-            response.answer = 'NG out of range'
-            return
-        dt = 1.0
-        r = self.send_goal_gripper(gripper, dt)
-        if self.check_action_result(r, response):
-            return
-        response.answer = 'OK'
+        self.set_max_velocity(0.5)
+        success = self.move_gripper(gripper)
+        if success:
+            result.answer = 'OK'
+        else:
+            result.answer = f'NG {words[0]} move_gripper() failed'
 
-    def check_action_result(self, r, response, message=''):
-        if message != '':
-            message += ' '
-        if r is None:
-            response.answer = f'NG {message}timeout'
-            return True
-        if r.result.error_code != 0:
-            response.answer = f'NG {message}error_code: {r.result.error_code}'
-            return True
-        return False
+    def cancel_callback(self, goal_handle):
+        self.get_logger().info('キャンセル受信')
+        self.cancel_joint_and_gripper()
+        return CancelResponse.ACCEPT
 
-    def send_goal_joint(self, q, time):
-        goal_msg = FollowJointTrajectory.Goal()
-        goal_msg.trajectory = JointTrajectory()
-        goal_msg.trajectory.header.stamp = self.get_clock().now().to_msg()
-        goal_msg.trajectory.joint_names = self.joint_names
-        goal_msg.trajectory.points = [JointTrajectoryPoint()]
-        goal_msg.trajectory.points[0].positions = [
+    def handle_accepted_callback(self, goal_handle):
+        with self.goal_lock:
+            if self.goal_handle is not None and self.goal_handle.is_active:
+                self.get_logger().info('前の処理を中止')
+                self.goal_handle.abort()
+                self.cancel_joint_and_gripper()
+            self.goal_handle = goal_handle
+        goal_handle.execute()
+
+    def cancel_joint_and_gripper(self):
+        if self.moveit2.query_state() == MoveIt2State.EXECUTING:
+            self.moveit2.cancel_execution()
+        if self.gripper_interface.query_state() == MoveIt2State.EXECUTING:
+            self.gripper_interface.cancel_execution()
+
+    def move_joint(self, q):
+        joint_positions = [
             float(q[0]), float(q[1]), float(q[2]), float(q[3])]
-        goal_msg.trajectory.points[0].time_from_start = Duration(
-            seconds=int(time), nanoseconds=(time-int(time))*1e9).to_msg()
-        self.action_done_event.clear()
-        send_goal_future = self.action_client_joint.send_goal_async(goal_msg)
-        send_goal_future.add_done_callback(self.goal_response_callback)
-        self.action_result = None
-        self.action_done_event.wait(time*2)
-        return self.action_result
+        self.moveit2.move_to_configuration(joint_positions)
+        return self.moveit2.wait_until_executed()
 
-    def send_goal_gripper(self, gripper, time):
-        goal_msg = FollowJointTrajectory.Goal()
-        goal_msg.trajectory = JointTrajectory()
-        goal_msg.trajectory.header.stamp = self.get_clock().now().to_msg()
-        goal_msg.trajectory.joint_names = self.gripper_names
-        goal_msg.trajectory.points = [JointTrajectoryPoint()]
-        goal_msg.trajectory.points[0].positions = [float(gripper)]
-        goal_msg.trajectory.points[0].time_from_start = Duration(
-            seconds=int(time), nanoseconds=(time-int(time))*1e9).to_msg()
-        self.action_done_event.clear()
-        send_goal_future = self.action_client_gripper.send_goal_async(goal_msg)
-        send_goal_future.add_done_callback(self.goal_response_callback)
-        self.action_result = None
-        self.action_done_event.wait(time*2)
-        return self.action_result
+    def move_gripper(self, q):
+        position = float(q)
+        self.gripper_interface.move_to_position(position)
+        return self.gripper_interface.wait_until_executed()
 
-    def goal_response_callback(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            return
-        self.get_result_future = goal_handle.get_result_async()
-        self.get_result_future.add_done_callback(self.get_result_callback)
-
-    def get_result_callback(self, future):
-        self.action_result = future.result()
-        self.action_done_event.set()
+    def set_max_velocity(self, v):
+        self.moveit2.max_velocity = float(v)
 
 
 def main():
@@ -155,24 +172,31 @@ def main():
     rclpy.init()
 
     # ノードクラスのインスタンス
-    commander = Commander()
+    commander = CommanderMoveit()
+
+    # 別のスレッドでrclpy.spin()を実行する
+    executor = MultiThreadedExecutor()
+    thread = threading.Thread(target=rclpy.spin, args=(commander,executor,))
+    threading.excepthook = lambda x: ()
+    thread.start()
 
     # 初期ポーズへゆっくり移動させる
-    commander.send_goal_joint(commander.poses['home'], 5)
-    commander.send_goal_gripper(from_gripper_ratio(1), 1)
-    print('サービスサーバ待機')
+    commander.set_max_velocity(0.2)
+    commander.move_joint(commander.poses['home'])
+    commander.move_gripper(GRIPPER_MAX)
+    print('アクションサーバ待機')
 
-    # Ctrl+cでエラーにならないようにKeyboardInterruptを捕まえる
+    # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
-        executor = MultiThreadedExecutor()
-        rclpy.spin(commander, executor)
+        input('Enterキーを押すと終了\n')
     except KeyboardInterrupt:
-        pass
-
-    print('サービスサーバ停止')
-    # 終了ポーズへゆっくり移動させる
-    commander.send_goal_joint(commander.poses['zeros'], 5)
-    commander.send_goal_gripper(from_gripper_ratio(0), 1)
+        thread.join()
+    else:
+        print('アクションサーバ停止')
+        # 終了ポーズへゆっくり移動させる
+        commander.set_max_velocity(0.2)
+        commander.move_joint(commander.poses['zeros'])
+        commander.move_gripper(GRIPPER_MIN)
 
     rclpy.try_shutdown()
     print('終了')

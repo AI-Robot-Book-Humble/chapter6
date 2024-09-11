@@ -2,11 +2,13 @@
 
 ## 概要
 
-- アールティ社が公開している同社のロボットアーム[CRANE+ V2用のROS2ノード群 crane_plus](https://github.com/rt-net/crane_plus)を利用するノード．
-- ノードのプログラムは，Pythonで記述．
-- MoveIt2は使わずに，各関節へ指令値を送る．
-- [crane_plus_ignition](https://github.com/rt-net/crane_plus/tree/master/crane_plus_ignition)を使うことによってIgnition Gazebo内のCRANE+ V2を同じように動かすこともできる．
-- Ubuntu 22.04, ROS Humbleで作成・確認
+- アールティ社が公開している同社のロボットアーム[CRANE+ V2用のROS 2ノード群 crane_plus](https://github.com/rt-net/crane_plus)を利用するノード．
+- 実機とシミュレーションの両方に対応．
+- ノードのプログラムは，すべてPythonで記述．
+- MoveItは使わずに各関節へ指令値を送るものと，MoveItを利用するものがある．
+- MoveIt 2のPythonインタフェースとして[pymoveit2](https://github.com/AndrejOrsula/pymoveit2)を利用．
+- crane_plusは，[アールティ社のオリジナル](https://github.com/rt-net/crane_plus)ではなく，そこから[フォークしたもの](https://github.com/AI-Robot-Book-Humble/crane_plus)を使う．
+- Ubuntu 22.04, ROS Humbleで作成・確認．
 
 ## 準備
 
@@ -21,31 +23,53 @@
 
 ## インストール
 
-- crane_plusパッケージをインストールする．[crane_plusのREADME](https://github.com/rt-net/crane_plus/blob/master/README.md)に沿って作業する．
-
 - ROSのワークスペースを`~/airobot_ws`とする．
   ```
   cd ~/airobot_ws/src
   ```
 
-- このパッケージを含むリポジトリを入手
+- crane_plusパッケージは，アールティ社のものではなく，[AI-Robot-Book-Humbleにフォークしたもの](https://github.com/AI-Robot-Book-Humble/crane_plus)をクローンする．
   ```
-  git clone https://github.com/AI-Robot-Book-Humble/chapter6
+  git clone https://github.com/AI-Robot-Book-Humble/crane_plus.git
   ```
 
-- サービスのインタフェースを定義しているパッケージを含むリポジトリを入手
+- [crane_plusのREADME](https://github.com/AI-Robot-Book-Humble/crane_plus/blob/master/README.md)に沿って作業する．
   ```
-  git clone https://github.com/AI-Robot-Book-Humble/chapter2
+  rosdep install -r -y -i --from-paths .
+  cd ~/airobot_ws
+  colcon build --symlink-install
+  source install/setup.bash
+  ```
+
+- [pymoveit2](https://github.com/AndrejOrsula/pymoveit2)パッケージを入手し，ビルド
+  ```
+  cd ~/airobot_ws/src
+  git clone https://github.com/AndrejOrsula/pymoveit2.git
+  rosdep install -y -r -i --rosdistro ${ROS_DISTRO} --from-paths .
+  cd ~/airobot_ws
+  colcon build --merge-install --symlink-install --cmake-args "-DCMAKE_BUILD_TYPE=Release"
+  source install/setup.bash
+  ```
+
+- このパッケージを含むリポジトリを入手
+  ```
+  cd ~/airobot_ws/src
+  git clone https://github.com/AI-Robot-Book-Humble/chapter6.git
+  ```
+
+- アクションのインタフェースを定義しているパッケージを含むリポジトリを入手
+  ```
+  git clone https://github.com/AI-Robot-Book-Humble/chapter2.git
   ```
 
 - パッケージをビルド
   ```
   cd ~/airobot_ws
-  colcon build --packages-select airobot_interfaces crane_plus_commander
+  colcon build --symlink-install --packages-select airobot_interfaces crane_plus_commander
+  source install/setup.bash
   ```
 
-## 実行
-
+## 実行（MoveItなし）
 
 - 端末1
   - オーバレイの設定
@@ -54,13 +78,13 @@
     source install/setup.bash
     ```
 
-  - 実機の場合（robot_state_publisher付き）
+  - 実機の場合
     ```
-    ros2 launch crane_plus_commander crane_plus_control_rsp.launch.py
+    ros2 launch crane_plus_examples no_moveit_demo.launch.py
     ```
   - 実機の代わりIgnition Gazeboを使う場合
     ```
-    ros2 launch crane_plus_commander crane_plus_gazebo_no_moveit.launch.py 
+    ros2 launch crane_plus_gazebo no_moveit_crane_plus_with_table.launch.py 
     ```
 
 - 端末2
@@ -89,17 +113,51 @@
     ros2 run crane_plus_commander commander4
     ```
 
-  - tfを利用して順運動学の計算をする場合
+  - tfのフレームで与えられた点へ手先を位置決めする場合
     ```
     ros2 run crane_plus_commander commander5
     ```
 
-  - アクションクライアント＋サービスサーバとして使う場合
+## 実行（MoveItあり）
+
+- 端末1
+  - オーバレイの設定
+    ```
+    cd ~/airobot_ws
+    source install/setup.bash
+    ```
+
+  - 実機の場合
+    ```
+    ros2 launch crane_plus_examples endtip_demo.launch.py 
+    ```
+  - 実機の代わりIgnition Gazeboを使う場合
+    ```
+    ros2 launch crane_plus_gazebo endtip_crane_plus_with_table.launch.py 
+    ```
+
+- 端末2
+  - オーバレイの設定
+    ```
+    cd ~/airobot_ws
+    source install/setup.bash
+    ```
+  - キー操作で手先位置も変化させる場合（MoveIt利用）
+    ```
+    ros2 run crane_plus_commander commander2_moveit
+    ```
+
+  - tfのフレームで与えられた点へ手先を位置決めする場合（MoveIt利用）
+    ```
+    ros2 run crane_plus_commander commander5_moveit
+    ```
+
+  - アクションサーバとして使う場合（MoveIt利用）
     ```
     ros2 run crane_plus_commander commander6
     ```
 
-- 端末3（サービスサーバをテストする場合）
+- 端末3（アクションサーバをテストする場合）
   - テスト用のクライアント
     ```
     cd ~/airobot_ws
@@ -115,15 +173,17 @@
 
 ## 履歴
 
+- 2024-09-15: MoveItの導入など
 - 2023-10-15: ROS Humbleに対応
 - 2022-08-23: ライセンス・ドキュメントの整備
 
 ## ライセンス
 
-Copyright (c) 2022, 2023 MASUTANI Yasuhiro  
+Copyright (c) 2022, 2024 MASUTANI Yasuhiro  
 All rights reserved.  
 This project is licensed under the Apache License 2.0 license found in the LICENSE file in the root directory of this project.
 
 ## 参考文献
 
 - https://github.com/rt-net/crane_plus
+- https://github.com/AndrejOrsula/pymoveit2

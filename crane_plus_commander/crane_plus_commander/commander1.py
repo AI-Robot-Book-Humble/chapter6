@@ -1,7 +1,6 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
-from rclpy.parameter import Parameter
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import time
 import threading
@@ -25,14 +24,9 @@ class Commander(Node):
         self.publisher_gripper = self.create_publisher(
             JointTrajectory,
             'crane_plus_gripper_controller/joint_trajectory', 10)
-        # /clockトピックのパブリッシャが存在すればuse_sim_timeをTrueにする
-        if self.get_publishers_info_by_topic('/clock') != []:
-            self.set_parameters([Parameter('use_sim_time', Parameter.Type.BOOL, True)])
-            self.get_logger().info('/clockパブリッシャ検出，use_sim_time: True')
 
     def publish_joint(self, q, time):
         msg = JointTrajectory()
-        msg.header.stamp = self.get_clock().now().to_msg()
         msg.joint_names = self.joint_names
         msg.points = [JointTrajectoryPoint()]
         msg.points[0].positions = [
@@ -43,7 +37,6 @@ class Commander(Node):
 
     def publish_gripper(self, gripper, time):
         msg = JointTrajectory()
-        msg.header.stamp = self.get_clock().now().to_msg()
         msg.joint_names = ['crane_plus_joint_hand']
         msg.points = [JointTrajectoryPoint()]
         msg.points[0].positions = [float(gripper)]
@@ -81,7 +74,7 @@ def main():
     print('スペースキーを押して起立状態にする')
     print('Escキーを押して終了')
 
-    # Ctrl+cでエラーにならないようにKeyboardInterruptを捕まえる
+    # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
             # 変更前の値を保持
@@ -148,6 +141,7 @@ def main():
     except KeyboardInterrupt:
         thread.join()
     else:
+        print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
         gripper = 0
@@ -156,4 +150,3 @@ def main():
         commander.publish_gripper(gripper, dt)
 
     rclpy.try_shutdown()
-    print('終了')

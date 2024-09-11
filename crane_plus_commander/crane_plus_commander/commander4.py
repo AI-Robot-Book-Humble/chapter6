@@ -1,7 +1,6 @@
 import rclpy
 from rclpy.node import Node
 from rclpy.duration import Duration
-from rclpy.parameter import Parameter
 from rclpy.action import ActionClient
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from sensor_msgs.msg import JointState
@@ -40,14 +39,9 @@ class Commander(Node):
         self.action_client_joint = ActionClient(
             self, FollowJointTrajectory,
             'crane_plus_arm_controller/follow_joint_trajectory')
-        # /clockトピックのパブリッシャが存在すればuse_sim_timeをTrueにする
-        if self.get_publishers_info_by_topic('/clock') != []:
-            self.set_parameters([Parameter('use_sim_time', Parameter.Type.BOOL, True)])
-            self.get_logger().info('/clockパブリッシャ検出，use_sim_time: True')
 
     def publish_joint(self, q, time):
         msg = JointTrajectory()
-        msg.header.stamp = self.get_clock().now().to_msg()
         msg.joint_names = self.joint_names
         msg.points = [JointTrajectoryPoint()]
         msg.points[0].positions = [
@@ -58,7 +52,6 @@ class Commander(Node):
 
     def publish_gripper(self, gripper, time):
         msg = JointTrajectory()
-        msg.header.stamp = self.get_clock().now().to_msg()
         msg.joint_names = ['crane_plus_joint_hand']
         msg.points = [JointTrajectoryPoint()]
         msg.points[0].positions = [float(gripper)]
@@ -87,7 +80,6 @@ class Commander(Node):
     def send_goal_joint(self,  q, time):
         goal_msg = FollowJointTrajectory.Goal()
         goal_msg.trajectory = JointTrajectory()
-        goal_msg.trajectory.header.stamp = self.get_clock().now().to_msg()
         goal_msg.trajectory.joint_names = self.joint_names
         goal_msg.trajectory.points = [JointTrajectoryPoint()]
         goal_msg.trajectory.points[0].positions = [
@@ -129,7 +121,7 @@ def main():
 
     print('同期的なアクションの利用')
 
-    # Ctrl+cでエラーにならないようにKeyboardInterruptを捕まえる
+    # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
             # 目標関節値とともに送る目標時間
@@ -153,6 +145,7 @@ def main():
     except KeyboardInterrupt:
         thread.join()
     else:
+        print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
         gripper = 0
@@ -161,4 +154,3 @@ def main():
         commander.publish_gripper(gripper, dt)
 
     rclpy.try_shutdown()
-    print('終了')

@@ -26,9 +26,11 @@ setup(
         'console_scripts': [
             'commander1 = crane_plus_commander.commander1:main',
             'commander2 = crane_plus_commander.commander2:main',
+            'commander2_moveit = crane_plus_commander.commander2_moveit:main',
             'commander3 = crane_plus_commander.commander3:main',
             'commander4 = crane_plus_commander.commander4:main',
             'commander5 = crane_plus_commander.commander5:main',
+            'commander5_moveit = crane_plus_commander.commander5_moveit:main',
             'commander6 = crane_plus_commander.commander6:main',
             'test_client = crane_plus_commander.test_client:main',
          ],
