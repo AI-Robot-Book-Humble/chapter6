@@ -20,8 +20,6 @@ def from_gripper_ratio(ratio):
     gripper = GRIPPER_MIN + ratio * (GRIPPER_MAX - GRIPPER_MIN)
     return gripper
 
-def gripper_in_range(gripper):
-    return GRIPPER_MIN <= gripper <= GRIPPER_MAX
 
 # CRNAE+ V2用のMoveItで逆運動学を計算し関節値の指令を送るノード
 class CommanderMoveit(Node):
@@ -38,8 +36,8 @@ class CommanderMoveit(Node):
             node=self,
             joint_names=self.joint_names,
             base_link_name='crane_plus_base',
-            end_effector_name='crane_plus_link_tcp',
-            group_name='arm_tcp',
+            end_effector_name='crane_plus_link_endtip',
+            group_name='arm',
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
@@ -212,9 +210,10 @@ def main():
                         elbow_up = elbow_up_prev
                 elif c in 'gb':
                     gripper = from_gripper_ratio(ratio)
-                    if not gripper_in_range(gripper):
-                        print('グリッパ指令値が範囲外')
-                        gripper = gripper_prev
+
+                if not (GRIPPER_MIN <= gripper <= GRIPPER_MAX):
+                    print('グリッパ指令値が範囲外')
+                    gripper = gripper_prev
 
                 # 変化があれば指令を送る
                 if joint != joint_prev:
@@ -235,6 +234,7 @@ def main():
     except KeyboardInterrupt:
         thread.join()
     else:
+        print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
         gripper = 0
@@ -243,4 +243,3 @@ def main():
         commander.move_gripper(gripper)
 
     rclpy.try_shutdown()
-    print('終了')

@@ -186,6 +186,7 @@ def main():
     except KeyboardInterrupt:
         thread.join()
     else:
+        print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
         gripper = 0
@@ -194,4 +195,3 @@ def main():
         commander.publish_gripper(gripper, dt)
 
     rclpy.try_shutdown()
-    print('終了')

@@ -16,6 +16,7 @@ from pymoveit2 import MoveIt2, GripperInterface
 GRIPPER_MIN = -radians(40.62) + 0.001
 GRIPPER_MAX = radians(38.27) - 0.001
 
+
 # CRNAE+ V2用のMoveItで逆運動学を計算しtfのフレームで与えられた点へ手先を位置決めするノード
 class CommanderMoveit(Node):
 
@@ -31,8 +32,8 @@ class CommanderMoveit(Node):
             node=self,
             joint_names=self.joint_names,
             base_link_name='crane_plus_base',
-            end_effector_name='crane_plus_link_tcp',
-            group_name='arm_tcp',
+            end_effector_name='crane_plus_link_endtip',
+            group_name='arm',
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
@@ -61,6 +62,14 @@ class CommanderMoveit(Node):
         self.moveit2.move_to_configuration(joint_positions)
         return self.moveit2.wait_until_executed()
 
+    def move_gripper(self, q):
+        position = float(q)
+        self.gripper_interface.move_to_position(position)
+        return self.gripper_interface.wait_until_executed()
+
+    def set_max_velocity(self, v):
+        self.moveit2.max_velocity = float(v)
+
     def move_endtip(self, endtip):
         position = [float(endtip[0]), float(endtip[1]), float(endtip[2])]
         yaw = atan2(position[1], position[0])
@@ -72,17 +81,6 @@ class CommanderMoveit(Node):
         )
         return self.moveit2.wait_until_executed()
 
-    def open_gripper(self):
-        self.gripper_interface.open()
-        self.gripper_interface.wait_until_executed()
-         
-    def close_gripper(self):
-        self.gripper_interface.close()
-        self.gripper_interface.wait_until_executed()
-
-    def set_max_velocity(self, v):
-        self.moveit2.max_velocity = float(v)
-
     def get_frame_position(self, frame_id):
         try:
             when = rclpy.time.Time()
@@ -93,11 +91,11 @@ class CommanderMoveit(Node):
                 timeout=Duration(seconds=1.0))
         except TransformException as ex:
             self.get_logger().info(f'{ex}')
-            return None, ex
+            return None
         t = trans.transform.translation
         r = trans.transform.rotation
         roll, pitch, yaw = euler_from_quaternion([r.x, r.y, r.z, r.w])
-        return [t.x, t.y, t.z, roll, pitch, yaw], None
+        return [t.x, t.y, t.z, roll, pitch, yaw]
 
 
 # リストで表された3次元座標間の距離を計算する
@@ -105,8 +103,6 @@ def dist(a, b):
     return sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2)
 
 def main():
-    print('開始')
-
     # ROSクライアントの初期化
     rclpy.init()
 
@@ -123,7 +119,7 @@ def main():
     joint = [0.0, -1.16, -2.01, -0.73]
     commander.set_max_velocity(0.2)
     commander.move_joint(joint)
-    commander.open_gripper()
+    commander.move_gripper(GRIPPER_MIN)
 
     # 逆運動学の解の種類
     elbow_up = True
@@ -137,16 +133,22 @@ def main():
     DONE = 2
     state = INIT
 
+    print('rキーを押して再初期化')
+    print('Escキーを押して終了')
+
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
             # キーが押されているか？
             if kb.kbhit():
                 c = kb.getch()
-                if ord(c) == 27:  # Escキー
+                if c == 'r':
+                    print('再初期化')
+                    state = INIT
+                elif ord(c) == 27:  # Escキー
                     break
 
-            position, _ = commander.get_frame_position('target')
+            position = commander.get_frame_position('target')
             if position is None:
                 print('対象のフレームが見つからない')
             else:
@@ -160,26 +162,23 @@ def main():
                     if dist(xyz_now, xyz_first) > 0.01:
                         state = INIT
                     elif time_now - time_first > 1.0:
+                        state = DONE
                         commander.set_max_velocity(1.0)
                         pitch = 0
                         sucess = commander.move_endtip(xyz_now + [pitch])
                         if sucess:
                             print('move_endtip()成功')
-                            state = DONE
                         else:
                             print('move_endtip()失敗')
-                elif state == DONE:
-                    if dist(xyz_now, xyz_first) > 0.01:
-                        state = INIT
             time.sleep(0.01)            
     except KeyboardInterrupt:
         thread.join()
     else:
+        print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
         commander.set_max_velocity(0.2)
         commander.move_joint(joint)
-        commander.close_gripper()
+        commander.move_gripper(GRIPPER_MAX)
 
     rclpy.try_shutdown()
-    print('終了')

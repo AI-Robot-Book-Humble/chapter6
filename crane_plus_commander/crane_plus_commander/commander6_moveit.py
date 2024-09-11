@@ -20,9 +20,6 @@ def from_gripper_ratio(ratio):
     gripper = GRIPPER_MIN + ratio * (GRIPPER_MAX - GRIPPER_MIN)
     return gripper
 
-def gripper_in_range(gripper):
-    return GRIPPER_MIN <= gripper <= GRIPPER_MAX
-
 
 # 他からアクションのリクエストを受け付け，CRANE+ V2用のMoveItへ指令を送るノード
 class CommanderMoveit(Node):
@@ -39,8 +36,8 @@ class CommanderMoveit(Node):
             node=self,
             joint_names=self.joint_names,
             base_link_name='crane_plus_base',
-            end_effector_name='crane_plus_link_tcp',
-            group_name='arm_tcp',
+            end_effector_name='crane_plus_link_endtip',
+            group_name='arm',
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
@@ -122,10 +119,10 @@ class CommanderMoveit(Node):
         except ValueError:
             result.answer = f'NG {words[1]} unsuitable'
             return
-        gripper = from_gripper_ratio(gripper_ratio)
-        if not gripper_in_range(gripper):
+        if gripper_ratio < 0.0 or 1.0 < gripper_ratio:
             result.answer = 'NG out of range'
             return
+        gripper = from_gripper_ratio(gripper_ratio)
         self.set_max_velocity(0.5)
         success = self.move_gripper(gripper)
         if success:
@@ -187,7 +184,7 @@ def main():
     commander.set_max_velocity(0.2)
     commander.move_joint(commander.poses['home'])
     commander.move_gripper(GRIPPER_MAX)
-    print('サービスサーバ待機')
+    print('アクションサーバ待機')
 
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
@@ -195,7 +192,7 @@ def main():
     except KeyboardInterrupt:
         thread.join()
     else:
-        print('サービスサーバ停止')
+        print('アクションサーバ停止')
         # 終了ポーズへゆっくり移動させる
         commander.set_max_velocity(0.2)
         commander.move_joint(commander.poses['zeros'])

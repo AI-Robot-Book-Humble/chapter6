@@ -12,7 +12,7 @@ from tf_transformations import euler_from_quaternion, quaternion_from_euler
 from airobot_interfaces.action import StringCommand
 import threading
 from pymoveit2 import MoveIt2, GripperInterface, MoveIt2State
-from math import radians, sqrt, atan2
+from math import radians, atan2, sqrt
 
 GRIPPER_MIN = -radians(40.62) + 0.001
 GRIPPER_MAX = radians(38.27) - 0.001
@@ -24,9 +24,6 @@ def to_gripper_ratio(gripper):
 def from_gripper_ratio(ratio):
     gripper = GRIPPER_MIN + ratio * (GRIPPER_MAX - GRIPPER_MIN)
     return gripper
-
-def gripper_in_range(gripper):
-    return GRIPPER_MIN <= gripper <= GRIPPER_MAX
 
 
 # 他からアクションのリクエストを受け付け，CRANE+ V2用のMoveItへ指令を送るノード
@@ -44,8 +41,8 @@ class CommanderMoveit(Node):
             node=self,
             joint_names=self.joint_names,
             base_link_name='crane_plus_base',
-            end_effector_name='crane_plus_link_tcp',
-            group_name='arm_tcp',
+            end_effector_name='crane_plus_link_endtip',
+            group_name='arm',
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
@@ -135,10 +132,10 @@ class CommanderMoveit(Node):
         except ValueError:
             result.answer = f'NG {words[1]} unsuitable'
             return
-        gripper = from_gripper_ratio(gripper_ratio)
-        if not gripper_in_range(gripper):
+        if gripper_ratio < 0.0 or 1.0 < gripper_ratio:
             result.answer = 'NG out of range'
             return
+        gripper = from_gripper_ratio(gripper_ratio)
         self.set_max_velocity(0.5)
         success = self.move_gripper(gripper)
         if success:
@@ -151,9 +148,9 @@ class CommanderMoveit(Node):
             result.answer = f'NG {words[0]} argument required'
             return
         target = words[1]
-        xyzrpy, e = self.get_frame_position(target)
+        xyzrpy = self.get_frame_position(target)
         if xyzrpy is None:
-            result.answer = f'NG {target} {e}'
+            result.answer = f'NG cannot get frame {target}'
             return
         [x, y, z] = xyzrpy[0:3]
         pitch = 0.0
@@ -170,9 +167,9 @@ class CommanderMoveit(Node):
             return
         # 把持姿勢の計算
         target = words[1]
-        xyzrpy, e = self.get_frame_position(target)
+        xyzrpy = self.get_frame_position(target)
         if xyzrpy is None:
-            result.answer = f'NG {target} {e}'
+            result.answer = f'NG cannot get frame {target}'
             return
         self.get_logger().info(f'xyzrpy[0:3]: {xyzrpy[0:3]}')
         [x2, y2, z2] = xyzrpy[0:3]
@@ -221,11 +218,11 @@ class CommanderMoveit(Node):
                 timeout=Duration(seconds=1.0))
         except TransformException as ex:
             self.get_logger().info(f'{ex}')
-            return None, ex
+            return None
         t = trans.transform.translation
         r = trans.transform.rotation
         roll, pitch, yaw = euler_from_quaternion([r.x, r.y, r.z, r.w])
-        return [t.x, t.y, t.z, roll, pitch, yaw], None
+        return [t.x, t.y, t.z, roll, pitch, yaw]
 
     def cancel_callback(self, goal_handle):
         self.get_logger().info('キャンセル受信')
@@ -253,6 +250,14 @@ class CommanderMoveit(Node):
         self.moveit2.move_to_configuration(joint_positions)
         return self.moveit2.wait_until_executed()
 
+    def move_gripper(self, q):
+        position = float(q)
+        self.gripper_interface.move_to_position(position)
+        return self.gripper_interface.wait_until_executed()
+
+    def set_max_velocity(self, v):
+        self.moveit2.max_velocity = float(v)
+
     def move_endtip(self, endtip):
         position = [float(endtip[0]), float(endtip[1]), float(endtip[2])]
         yaw = atan2(position[1], position[0])
@@ -263,14 +268,6 @@ class CommanderMoveit(Node):
             quat_xyzw=quat_xyzw
         )
         return self.moveit2.wait_until_executed()
-
-    def move_gripper(self, q):
-        position = float(q)
-        self.gripper_interface.move_to_position(position)
-        return self.gripper_interface.wait_until_executed()
-
-    def set_max_velocity(self, v):
-        self.moveit2.max_velocity = float(v)
 
 
 def main():
@@ -292,7 +289,7 @@ def main():
     commander.set_max_velocity(0.2)
     commander.move_joint(commander.poses['home'])
     commander.move_gripper(GRIPPER_MAX)
-    print('サービスサーバ待機')
+    print('アクションサーバ待機')
 
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
@@ -300,7 +297,7 @@ def main():
     except KeyboardInterrupt:
         thread.join()
     else:
-        print('サービスサーバ停止')
+        print('アクションサーバ停止')
         # 終了ポーズへゆっくり移動させる
         commander.set_max_velocity(0.2)
         commander.move_joint(commander.poses['zeros'])

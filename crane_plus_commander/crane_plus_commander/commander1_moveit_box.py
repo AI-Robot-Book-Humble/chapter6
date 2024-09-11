@@ -26,8 +26,8 @@ class CommanderMoveit(Node):
             node=self,
             joint_names=self.joint_names,
             base_link_name='crane_plus_base',
-            end_effector_name='crane_plus_link_tcp',
-            group_name='arm_tcp',
+            end_effector_name='crane_plus_link_endtip',
+            group_name='arm',
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
@@ -150,6 +150,7 @@ def main():
     except KeyboardInterrupt:
         thread.join()
     else:
+        print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
         gripper = 0
@@ -158,4 +159,3 @@ def main():
         commander.move_gripper(gripper)
 
     rclpy.try_shutdown()
-    print('終了')

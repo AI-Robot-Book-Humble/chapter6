@@ -63,11 +63,11 @@ class Commander(Node):
                 timeout=Duration(seconds=1.0))
         except TransformException as ex:
             self.get_logger().info(f'{ex}')
-            return None, ex
+            return None
         t = trans.transform.translation
         r = trans.transform.rotation
         roll, pitch, yaw = euler_from_quaternion([r.x, r.y, r.z, r.w])
-        return [t.x, t.y, t.z, roll, pitch, yaw], None
+        return [t.x, t.y, t.z, roll, pitch, yaw]
 
 
 # リストで表された3次元座標かんの距離を計算する
@@ -75,8 +75,6 @@ def dist(a, b):
     return sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2)
 
 def main():
-    print('開始')
-
     # ROSクライアントの初期化
     rclpy.init()
 
@@ -110,16 +108,22 @@ def main():
     DONE = 2
     state = INIT
 
+    print('rキーを押して再初期化')
+    print('Escキーを押して終了')
+
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
             # キーが押されているか？
             if kb.kbhit():
                 c = kb.getch()
-                if ord(c) == 27:  # Escキー
+                if c == 'r':
+                    print('再初期化')
+                    state = INIT
+                elif ord(c) == 27:  # Escキー
                     break
 
-            position, _ = commander.get_frame_position('target')
+            position = commander.get_frame_position('target')
             if position is None:
                 print('対象のフレームが見つからない')
             else:
@@ -133,6 +137,7 @@ def main():
                     if dist(xyz_now, xyz_first) > 0.01:
                         state = INIT
                     elif time_now - time_first > 1.0:
+                        state = DONE
                         pitch = 0
                         joint = inverse_kinematics(xyz_now + [pitch], elbow_up)
                         if joint is None:
@@ -144,14 +149,11 @@ def main():
                             dt = 0.5
                             commander.publish_joint(joint, dt)
                             time.sleep(dt)
-                            state = DONE
-                elif state == DONE:
-                    if dist(xyz_now, xyz_first) > 0.01:
-                        state = INIT
             time.sleep(0.01)            
     except KeyboardInterrupt:
         thread.join()
     else:
+        print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
         gripper = GRIPPER_MAX
@@ -160,4 +162,3 @@ def main():
         commander.publish_gripper(gripper, dt)
 
     rclpy.try_shutdown()
-    print('終了')
