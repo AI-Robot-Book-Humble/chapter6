@@ -41,9 +41,8 @@ class CommanderMoveit(Node):
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
-        self.moveit2.max_velocity = 0.5
-        self.moveit2.max_acceleration = 0.5
-        self.cancel_after_secs = 0.0
+        self.moveit2.max_velocity = 1.0
+        self.moveit2.max_acceleration = 1.0
 
         gripper_joint_names = ['crane_plus_joint_hand']
         self.gripper_interface = GripperInterface(
@@ -53,8 +52,9 @@ class CommanderMoveit(Node):
             closed_gripper_joint_positions=[GRIPPER_MAX],
             gripper_group_name='gripper',
             callback_group=callback_group,
-            gripper_command_action_name='gripper_action_controller/gripper_cmd',
         )
+        self.gripper_interface.max_velocity = 1.0
+        self.gripper_interface.max_acceleration = 1.0
 
     def move_joint(self, q):
         joint_positions = [
@@ -133,20 +133,22 @@ def main():
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
-            # 順運動学
-            [x, y, z, pitch] = commander.forward_kinematics(joint)
-            ratio = to_gripper_ratio(gripper)
-
-            # 変更前の値を保持
-            joint_prev = joint.copy()
-            gripper_prev = gripper
-            elbow_up_prev = elbow_up
-
-            commander.set_max_velocity(1.0)
-
+            time.sleep(0.01)
             # キーが押されているか？
             if kb.kbhit():
                 c = kb.getch()
+
+                # 順運動学
+                [x, y, z, pitch] = commander.forward_kinematics(joint)
+                ratio = to_gripper_ratio(gripper)
+
+                # 変更前の値を保持
+                joint_prev = joint.copy()
+                gripper_prev = gripper
+                elbow_up_prev = elbow_up
+
+                commander.set_max_velocity(1.0)
+
                 # 押されたキーによって場合分けして処理
                 if c == '1':
                     joint[0] -= 0.1
@@ -201,9 +203,7 @@ def main():
 
                 # 逆運動学
                 if c in 'azsxdcfve':
-                    print('inverse_kinematics() ...', end='')
                     joint = commander.inverse_kinematics([x, y, z, pitch], elbow_up)
-                    print(' done')
                     if joint is None:
                         print('逆運動学の解なし')
                         joint = joint_prev.copy()
@@ -229,8 +229,6 @@ def main():
                     if not success:
                         print('move_gripper()失敗')
                         gripper = gripper_prev
-
-            time.sleep(0.01)
     except KeyboardInterrupt:
         thread.join()
     else:

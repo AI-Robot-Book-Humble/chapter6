@@ -106,16 +106,17 @@ def main():
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
-            # 変更前の値を保持
-            joint_prev = joint.copy()
-            gripper_prev = gripper
-
-            # 目標関節値とともに送る目標時間
-            dt = 0.2
-
+            time.sleep(0.01)
             # キーが押されているか？
             if kb.kbhit():
                 c = kb.getch()
+                # 変更前の値を保持
+                joint_prev = joint.copy()
+                gripper_prev = gripper
+
+                # 目標関節値とともに送る目標時間
+                dt = 0.2
+
                 # 押されたキーによって場合分けして処理
                 if c == '1':
                     joint[0] -= 0.1
@@ -166,7 +167,6 @@ def main():
                 # パブリッシュした場合は，設定時間と同じだけ停止
                 if publish:
                     time.sleep(dt)
-            time.sleep(0.01)
     except KeyboardInterrupt:
         thread.join()
     else:

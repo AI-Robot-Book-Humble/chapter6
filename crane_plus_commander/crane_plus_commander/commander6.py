@@ -41,9 +41,8 @@ class CommanderMoveit(Node):
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
-        self.moveit2.max_velocity = 0.5
-        self.moveit2.max_acceleration = 0.5
-        self.cancel_after_secs = 0.0
+        self.moveit2.max_velocity = 1.0
+        self.moveit2.max_acceleration = 1.0
 
         gripper_joint_names = ['crane_plus_joint_hand']
         self.gripper_interface = GripperInterface(
@@ -53,8 +52,9 @@ class CommanderMoveit(Node):
             closed_gripper_joint_positions=[GRIPPER_MAX],
             gripper_group_name='gripper',
             callback_group=callback_group,
-            gripper_command_action_name='gripper_action_controller/gripper_cmd',
         )
+        self.gripper_interface.max_velocity = 1.0
+        self.gripper_interface.max_acceleration = 1.0
 
         # 文字列とポーズの組を保持する辞書
         self.poses = {}

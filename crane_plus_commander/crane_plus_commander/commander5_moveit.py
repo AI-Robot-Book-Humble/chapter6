@@ -37,9 +37,8 @@ class CommanderMoveit(Node):
             callback_group=callback_group,
         )
         self.moveit2.planner_id = 'RRTConnectkConfigDefault'
-        self.moveit2.max_velocity = 0.5
-        self.moveit2.max_acceleration = 0.5
-        self.cancel_after_secs = 0.0
+        self.moveit2.max_velocity = 1.0
+        self.moveit2.max_acceleration = 1.0
 
         gripper_joint_names = ['crane_plus_joint_hand']
         self.gripper_interface = GripperInterface(
@@ -49,8 +48,9 @@ class CommanderMoveit(Node):
             closed_gripper_joint_positions=[GRIPPER_MAX],
             gripper_group_name='gripper',
             callback_group=callback_group,
-            gripper_command_action_name='gripper_action_controller/gripper_cmd',
         )
+        self.gripper_interface.max_velocity = 1.0
+        self.gripper_interface.max_acceleration = 1.0
 
         # tf
         self.tf_buffer = Buffer()
@@ -117,9 +117,10 @@ def main():
 
     # 初期ポーズへゆっくり移動させる
     joint = [0.0, -1.16, -2.01, -0.73]
+    gripper = GRIPPER_MIN
     commander.set_max_velocity(0.2)
     commander.move_joint(joint)
-    commander.move_gripper(GRIPPER_MIN)
+    commander.move_gripper(gripper)
 
     # 逆運動学の解の種類
     elbow_up = True
@@ -139,6 +140,7 @@ def main():
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
+            time.sleep(0.01)            
             # キーが押されているか？
             if kb.kbhit():
                 c = kb.getch()
@@ -170,15 +172,15 @@ def main():
                             print('move_endtip()成功')
                         else:
                             print('move_endtip()失敗')
-            time.sleep(0.01)            
     except KeyboardInterrupt:
         thread.join()
     else:
         print('終了')
         # 終了ポーズへゆっくり移動させる
         joint = [0.0, 0.0, 0.0, 0.0]
+        gripper = GRIPPER_MAX
         commander.set_max_velocity(0.2)
         commander.move_joint(joint)
-        commander.move_gripper(GRIPPER_MAX)
+        commander.move_gripper(gripper)
 
     rclpy.try_shutdown()

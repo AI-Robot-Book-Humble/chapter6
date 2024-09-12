@@ -30,6 +30,7 @@ class Commander(Node):
         self.publisher_gripper = self.create_publisher(
             JointTrajectory,
             'crane_plus_gripper_controller/joint_trajectory', 10)
+
         # tf
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -70,7 +71,7 @@ class Commander(Node):
         return [t.x, t.y, t.z, roll, pitch, yaw]
 
 
-# リストで表された3次元座標かんの距離を計算する
+# リストで表された3次元座標間の距離を計算する
 def dist(a, b):
     return sqrt((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2)
 
@@ -114,6 +115,7 @@ def main():
     # Ctrl+CでエラーにならないようにKeyboardInterruptを捕まえる
     try:
         while True:
+            time.sleep(0.01)            
             # キーが押されているか？
             if kb.kbhit():
                 c = kb.getch()
@@ -149,7 +151,6 @@ def main():
                             dt = 0.5
                             commander.publish_joint(joint, dt)
                             time.sleep(dt)
-            time.sleep(0.01)            
     except KeyboardInterrupt:
         thread.join()
     else:
