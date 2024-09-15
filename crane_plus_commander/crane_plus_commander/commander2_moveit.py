@@ -4,9 +4,9 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 import time
 import threading
+from math import radians, atan2
 from crane_plus_commander.kbhit import KBHit
 from pymoveit2 import MoveIt2, GripperInterface
-from math import radians, atan2
 from tf_transformations import euler_from_quaternion, quaternion_from_euler
 
 GRIPPER_MIN = -radians(40.62) + 0.001
