@@ -40,7 +40,6 @@ class CommanderMoveit(Node):
             group_name='arm',
             callback_group=callback_group,
         )
-        self.moveit2.planner_id = 'RRTConnectkConfigDefault'
         self.moveit2.max_velocity = 1.0
         self.moveit2.max_acceleration = 1.0
 
