@@ -103,7 +103,7 @@ def main():
             else:
                 node.send_goal(command)
     except KeyboardInterrupt:
-        pass
+        thread.join()
 
     rclpy.try_shutdown()
 
