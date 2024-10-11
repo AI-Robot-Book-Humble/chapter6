@@ -30,7 +30,7 @@
 
 - crane_plusパッケージは，アールティ社のものではなく，[AI-Robot-Book-Humbleにフォークしたもの](https://github.com/AI-Robot-Book-Humble/crane_plus)をクローンする．
   ```
-  git clone https://github.com/AI-Robot-Book-Humble/crane_plus.git
+  git clone https://github.com/AI-Robot-Book-Humble/crane_plus
   ```
 
 - [crane_plusのREADME](https://github.com/AI-Robot-Book-Humble/crane_plus/blob/master/README.md)に沿って作業する．
@@ -44,7 +44,7 @@
 - [pymoveit2](https://github.com/AndrejOrsula/pymoveit2)パッケージを入手し，ビルド
   ```
   cd ~/airobot_ws/src
-  git clone https://github.com/AndrejOrsula/pymoveit2.git
+  git clone https://github.com/AndrejOrsula/pymoveit2
   rosdep install -y -r -i --rosdistro ${ROS_DISTRO} --from-paths .
   cd ~/airobot_ws
   colcon build --merge-install --symlink-install --cmake-args "-DCMAKE_BUILD_TYPE=Release"
@@ -54,14 +54,18 @@
 - このパッケージを含むリポジトリを入手
   ```
   cd ~/airobot_ws/src
-  git clone https://github.com/AI-Robot-Book-Humble/chapter6.git
+  git clone https://github.com/AI-Robot-Book-Humble/chapter6
   ```
 
 - アクションのインタフェースを定義しているパッケージを含むリポジトリを入手
   ```
-  git clone https://github.com/AI-Robot-Book-Humble/chapter2.git
+  git clone https://github.com/AI-Robot-Book-Humble/chapter2
   ```
 
+- アクション通信のテストクライアントを含むリポジトリを入手
+  ```
+  git clone https://github.com/AI-Robot-Book-Humble/appendixB
+  ```
 - パッケージをビルド
   ```
   cd ~/airobot_ws
@@ -154,7 +158,7 @@
 
   - アクションサーバとして使う場合（MoveIt利用）
     ```
-    ros2 run crane_plus_commander commander6
+    ros2 run crane_plus_commander commander6_moveit
     ```
 
 - 端末3（アクションサーバをテストする場合）
@@ -162,7 +166,7 @@
     ```
     cd ~/airobot_ws
     source install/setup.bash
-    ros2 run crane_plus_commander test_client
+    ros2 run airobot_action test_client /manipulation/command
     ```
 
 ## ヘルプ
