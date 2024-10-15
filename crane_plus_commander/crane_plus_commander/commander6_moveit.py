@@ -67,7 +67,7 @@ class CommanderMoveit(Node):
             self,
             StringCommand,
             'manipulation/command',
-            self.execute_callback,
+            execute_callback=self.execute_callback,
             cancel_callback=self.cancel_callback,
             handle_accepted_callback=self.handle_accepted_callback,
             callback_group=callback_group,
