@@ -21,7 +21,7 @@ ROS 2とPythonで作って学ぶAIロボット入門（出村・萩原・升谷�
 - 6.6.3 tfを使ったプログラム [commander5.py](crane_plus_commander/crane_plus_commander/commander5.py)
 - 6.7.4 MoveItで運動学計算するプログラム [commander2_moveit.py](crane_plus_commander/crane_plus_commander/commander2_moveit.py)
 - 6.7.5 MoveItにで手先移動するプログラム [commander5_moveit.py](crane_plus_commander/crane_plus_commander/commander5_moveit.py)
-- 6.8 他のノードから指令を受けて動作するプログラム [commander6.py](crane_plus_commander/crane_plus_commander/commander6.py)
+- 6.8 他のノードから指令を受けて動作するプログラム [commander6_moveit.py](crane_plus_commander/crane_plus_commander/commander6_moveit.py)
 
 ## 補足情報
 
