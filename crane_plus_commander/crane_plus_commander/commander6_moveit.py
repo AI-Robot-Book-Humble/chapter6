@@ -72,12 +72,21 @@ class CommanderMoveit(Node):
             handle_accepted_callback=self.handle_accepted_callback,
             callback_group=callback_group,
         )
-        self.goal_handle = None
-        self.goal_lock = threading.Lock()
-        self.execute_lock = threading.Lock()
+        self.goal_handle = None               # 処理中のゴールの情報を保持する変数
+        self.goal_lock = threading.Lock()     # 二重実行させないためのロック変数
+        self.execute_lock = threading.Lock()  # 二重実行させないためのロック変数
+
+    def handle_accepted_callback(self, goal_handle):
+        with self.goal_lock:                  # ブロック内を二重実行させない
+            if self.goal_handle is not None and self.goal_handle.is_active:
+                self.get_logger().info('前の処理を中止')
+                self.goal_handle.abort()
+                self.cancel_joint_and_gripper()
+            self.goal_handle = goal_handle   # ゴール情報の更新
+        goal_handle.execute()                # ゴール処理の実行
 
     def execute_callback(self, goal_handle):
-        with self.execute_lock:
+        with self.execute_lock:              # ブロック内を二重実行させない
             self.get_logger().info(f'command: {goal_handle.request.command}')
             result = StringCommand.Result()
             words = goal_handle.request.command.split()
@@ -133,15 +142,6 @@ class CommanderMoveit(Node):
         self.get_logger().info('キャンセル受信')
         self.cancel_joint_and_gripper()
         return CancelResponse.ACCEPT
-
-    def handle_accepted_callback(self, goal_handle):
-        with self.goal_lock:
-            if self.goal_handle is not None and self.goal_handle.is_active:
-                self.get_logger().info('前の処理を中止')
-                self.goal_handle.abort()
-                self.cancel_joint_and_gripper()
-            self.goal_handle = goal_handle
-        goal_handle.execute()
 
     def cancel_joint_and_gripper(self):
         if self.moveit2.query_state() == MoveIt2State.EXECUTING:
