@@ -37,7 +37,7 @@
   ```
   rosdep install -r -y -i --from-paths .
   cd ~/airobot_ws
-  colcon build --symlink-install
+  colcon build
   source install/setup.bash
   ```
 
@@ -47,7 +47,7 @@
   git clone https://github.com/AndrejOrsula/pymoveit2
   rosdep install -y -r -i --rosdistro ${ROS_DISTRO} --from-paths .
   cd ~/airobot_ws
-  colcon build --merge-install --symlink-install --cmake-args "-DCMAKE_BUILD_TYPE=Release"
+  colcon build --merge-install --cmake-args "-DCMAKE_BUILD_TYPE=Release"
   source install/setup.bash
   ```
 
@@ -69,7 +69,7 @@
 - パッケージをビルド
   ```
   cd ~/airobot_ws
-  colcon build --symlink-install --packages-select airobot_interfaces crane_plus_commander
+  colcon build --packages-select airobot_interfaces crane_plus_commander
   source install/setup.bash
   ```
 
