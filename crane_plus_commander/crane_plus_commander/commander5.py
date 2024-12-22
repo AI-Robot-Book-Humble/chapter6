@@ -147,7 +147,7 @@ def main():
                         elif not all(joint_in_range(joint)):
                             print('関節指令値が範囲外')
                         else:
-                            print(f'関節指令値： {joint[0]:.2f}, {joint[1]:.2f},',
+                            print(f'関節指令値： [{joint[0]:.2f}, {joint[1]:.2f},',
                                 f'{joint[2]:.2f}, {joint[3]:.2f}]')
                             dt = 0.5
                             commander.publish_joint(joint, dt)
