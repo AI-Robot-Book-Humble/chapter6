@@ -1,4 +1,4 @@
-# 簡単な2自由度ロボットアームのモデル（Humble版）
+# 簡単な2自由度ロボットアームのモデル（改訂第2版）
 
 ## 概要
 
@@ -47,7 +47,7 @@
 
 ## ライセンス
 
-Copyright (c) 2022, MASUTANI Yasuhiro  
+Copyright (c) 2022-2025, MASUTANI Yasuhiro  
 All rights reserved.  
 This project is licensed under the Apache License 2.0 license found in the LICENSE file in the root directory of this project.
 
