@@ -166,8 +166,8 @@ def main():
                         state = DONE
                         commander.set_max_velocity(1.0)
                         pitch = 0
-                        sucess = commander.move_endtip(xyz_now + [pitch])
-                        if sucess:
+                        success = commander.move_endtip(xyz_now + [pitch])
+                        if success:
                             print('move_endtip()成功')
                         else:
                             print('move_endtip()失敗')
